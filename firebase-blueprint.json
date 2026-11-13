@@ -1,0 +1,188 @@
+{
+  "entities": {
+    "StoreConfig": {
+      "title": "StoreConfig",
+      "description": "Official Bazar Zaatar store contact info, location, and promotional banner settings managed by administrators.",
+      "type": "object",
+      "properties": {
+        "businessName": { "type": "string", "description": "Business name in French/Latin" },
+        "businessNameAr": { "type": "string", "description": "Business name in Arabic" },
+        "address": { "type": "string", "description": "Physical store address" },
+        "latitude": { "type": "number", "description": "Store latitude coordinate" },
+        "longitude": { "type": "number", "description": "Store longitude coordinate" },
+        "mapsUrl": { "type": "string", "description": "Google Maps URL" },
+        "phoneNumber": { "type": "string", "description": "Official phone number entered by admin" },
+        "whatsappNumber": { "type": "string", "description": "Official WhatsApp number entered by admin" },
+        "facebookUrl": { "type": "string", "description": "Official Facebook page URL" },
+        "instagramUrl": { "type": "string", "description": "Official Instagram page URL" },
+        "bannerTitleAr": { "type": "string", "description": "Promotional banner headline in Arabic" },
+        "bannerTitleFr": { "type": "string", "description": "Promotional banner headline in French" },
+        "bannerSubtitleAr": { "type": "string", "description": "Promotional banner subtitle in Arabic" },
+        "bannerSubtitleFr": { "type": "string", "description": "Promotional banner subtitle in French" },
+        "bannerActive": { "type": "boolean", "description": "Whether promotional banner is active" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp of last update (FieldValue.serverTimestamp())" }
+      },
+      "required": ["businessName", "businessNameAr", "address", "latitude", "longitude", "mapsUrl", "bannerActive", "updatedAt"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Product category in Bazar Zaatar catalog.",
+      "type": "object",
+      "properties": {
+        "nameAr": { "type": "string", "description": "Arabic category name" },
+        "nameFr": { "type": "string", "description": "French category name" },
+        "slug": { "type": "string", "description": "URL-safe category slug" },
+        "sortOrder": { "type": "integer", "description": "Display sort order" },
+        "active": { "type": "boolean", "description": "Visible on storefront" },
+        "iconKey": { "type": "string", "description": "Icon identifier" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp" }
+      },
+      "required": ["nameAr", "nameFr", "slug", "sortOrder", "active", "iconKey", "createdAt", "updatedAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Clothing or footwear item managed by the Bazar Zaatar administrator.",
+      "type": "object",
+      "properties": {
+        "nameAr": { "type": "string", "description": "Product name in Arabic" },
+        "nameFr": { "type": "string", "description": "Product name in French" },
+        "descriptionAr": { "type": "string", "description": "Arabic description" },
+        "descriptionFr": { "type": "string", "description": "French description" },
+        "categoryId": { "type": "string", "description": "Referenced category ID" },
+        "priceDzd": { "type": "number", "description": "Regular price in Algerian Dinars (DZD)" },
+        "discountPriceDzd": { "type": "number", "description": "Optional discounted price in DZD" },
+        "sizes": { "type": "array", "description": "Available sizes" },
+        "colors": { "type": "array", "description": "Available colors" },
+        "stockQuantity": { "type": "integer", "description": "Current stock count" },
+        "inStock": { "type": "boolean", "description": "Stock availability flag" },
+        "featured": { "type": "boolean", "description": "Featured on homepage" },
+        "newArrival": { "type": "boolean", "description": "Shown in latest arrivals" },
+        "specialOffer": { "type": "boolean", "description": "Shown in special offers" },
+        "active": { "type": "boolean", "description": "Published on storefront" },
+        "imageUrl": { "type": "string", "description": "HTTPS URL or compressed data URI image" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp" }
+      },
+      "required": ["nameAr", "nameFr", "categoryId", "priceDzd", "sizes", "colors", "stockQuantity", "inStock", "featured", "newArrival", "specialOffer", "active", "createdAt", "updatedAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private customer profile information.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID" },
+        "displayName": { "type": "string", "description": "Customer display name" },
+        "email": { "type": "string", "description": "Customer email" },
+        "phoneNumber": { "type": "string", "description": "Saved phone number" },
+        "defaultAddress": { "type": "string", "description": "Saved delivery address" },
+        "preferredLang": { "type": "string", "enum": ["ar", "fr"], "description": "Preferred UI language" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp" }
+      },
+      "required": ["userId", "displayName", "preferredLang", "createdAt", "updatedAt"]
+    },
+    "CartItem": {
+      "title": "CartItem",
+      "description": "Shopping cart item belonging to a user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID" },
+        "productId": { "type": "string", "description": "Referenced product ID" },
+        "productNameAr": { "type": "string", "description": "Arabic product name snapshot" },
+        "productNameFr": { "type": "string", "description": "French product name snapshot" },
+        "productImageUrl": { "type": "string", "description": "Product image snapshot" },
+        "unitPriceDzd": { "type": "number", "description": "Effective unit price in DZD" },
+        "selectedSize": { "type": "string", "description": "Chosen size" },
+        "selectedColor": { "type": "string", "description": "Chosen color" },
+        "quantity": { "type": "integer", "description": "Quantity selected" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp" }
+      },
+      "required": ["userId", "productId", "productNameAr", "productNameFr", "unitPriceDzd", "selectedSize", "selectedColor", "quantity", "createdAt", "updatedAt"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer purchase order submitted from the shopping cart.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Customer Firebase Auth UID" },
+        "customerName": { "type": "string", "description": "Recipient full name" },
+        "phoneNumber": { "type": "string", "description": "Customer phone number" },
+        "deliveryAddress": { "type": "string", "description": "Delivery address in Algeria" },
+        "items": { "type": "array", "description": "Purchased line items" },
+        "subtotalDzd": { "type": "number", "description": "Order subtotal in DZD" },
+        "totalDzd": { "type": "number", "description": "Order total in DZD" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "shipped", "delivered", "cancelled"], "description": "Order fulfillment status" },
+        "notes": { "type": "string", "description": "Optional customer notes" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp" }
+      },
+      "required": ["userId", "customerName", "phoneNumber", "deliveryAddress", "items", "subtotalDzd", "totalDzd", "status", "createdAt", "updatedAt"]
+    },
+    "Reservation": {
+      "title": "Reservation",
+      "description": "Boutique visit reservation for Bazar Zaatar.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Customer Firebase Auth UID" },
+        "customerName": { "type": "string", "description": "Visitor full name" },
+        "phoneNumber": { "type": "string", "description": "Visitor phone number" },
+        "preferredDate": { "type": "string", "description": "Preferred visit date" },
+        "preferredTime": { "type": "string", "description": "Preferred visit time" },
+        "visitorCount": { "type": "integer", "description": "Number of visitors" },
+        "notes": { "type": "string", "description": "Additional reservation notes" },
+        "channel": { "type": "string", "enum": ["whatsapp", "in_app"], "description": "Submission channel" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "cancelled"], "description": "Reservation status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server update timestamp" }
+      },
+      "required": ["userId", "customerName", "phoneNumber", "preferredDate", "preferredTime", "visitorCount", "channel", "status", "createdAt", "updatedAt"]
+    },
+    "AdminRole": {
+      "title": "AdminRole",
+      "description": "Administrator authorization record keyed by Firebase Auth UID.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Admin Firebase Auth UID" },
+        "email": { "type": "string", "description": "Admin email address" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server creation timestamp" }
+      },
+      "required": ["uid", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/store_config/{configId}": {
+      "schema": { "$ref": "#/entities/StoreConfig" },
+      "description": "Public storefront configuration (phone, WhatsApp, banner) editable only by administrators."
+    },
+    "/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Bazar Zaatar clothing and footwear categories."
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Dynamic Bazar Zaatar product catalog managed by administrators."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private customer profile and saved preferences."
+    },
+    "/users/{userId}/cart/{cartItemId}": {
+      "schema": { "$ref": "#/entities/CartItem" },
+      "description": "User-owned shopping cart items."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Customer orders isolated by userId and readable/updatable by administrators."
+    },
+    "/reservations/{reservationId}": {
+      "schema": { "$ref": "#/entities/Reservation" },
+      "description": "Boutique visit reservations isolated by userId and readable/updatable by administrators."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminRole" },
+      "description": "Trusted administrator role lookup table."
+    }
+  }
+}

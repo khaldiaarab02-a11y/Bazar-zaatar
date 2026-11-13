@@ -1,0 +1,6 @@
+{
+  "name": "Bazar Zaatar",
+  "description": "Mobile shopping and boutique reservation app for Bazar Zaatar (بازار زعتر) Men's Fashion & Kids Clothing in Tiaret, Algeria.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
