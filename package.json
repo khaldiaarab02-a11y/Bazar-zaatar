@@ -1,0 +1,14 @@
+{
+  "name": "bazar-zaatar-firebase-rules",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Local Firebase Firestore security-rules tests for Bazar Zaatar",
+  "scripts": {
+    "test:rules": "firebase emulators:exec --only firestore --project demo-bazar-zaatar \"node --test firestore.test.js\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "firebase": "^11.0.0",
+    "firebase-tools": "^13.29.2"
+  }
+}

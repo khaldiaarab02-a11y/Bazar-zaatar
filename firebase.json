@@ -1,7 +1,7 @@
 {
   "firestore": [
     {
-      "database": "ai-studio-android-bazarzaa-2f310af9-bcae-49c8-9e15-6afd311a9d6d",
+      "database": "(default)",
       "rules": "firestore.rules"
     }
   ],

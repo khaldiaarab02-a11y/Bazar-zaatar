@@ -115,18 +115,84 @@ service cloud.firestore {
              isValidTimestamp(data.updatedAt);
     }
 
+    // Spark-compatible order validation. Client order writes are constrained by rules;
+    // no Cloud Functions / Blaze billing is required. Keep each order to at most 10 lines
+    // so product lookups stay within Firestore Rules document-access limits.
+    function orderQuantityForProduct(data, productId) {
+      return (data.items.size() > 0 && data.items[0].productId == productId ? data.items[0].quantity : 0) +
+             (data.items.size() > 1 && data.items[1].productId == productId ? data.items[1].quantity : 0) +
+             (data.items.size() > 2 && data.items[2].productId == productId ? data.items[2].quantity : 0) +
+             (data.items.size() > 3 && data.items[3].productId == productId ? data.items[3].quantity : 0) +
+             (data.items.size() > 4 && data.items[4].productId == productId ? data.items[4].quantity : 0) +
+             (data.items.size() > 5 && data.items[5].productId == productId ? data.items[5].quantity : 0) +
+             (data.items.size() > 6 && data.items[6].productId == productId ? data.items[6].quantity : 0) +
+             (data.items.size() > 7 && data.items[7].productId == productId ? data.items[7].quantity : 0) +
+             (data.items.size() > 8 && data.items[8].productId == productId ? data.items[8].quantity : 0) +
+             (data.items.size() > 9 && data.items[9].productId == productId ? data.items[9].quantity : 0);
+    }
+
+    function isValidOrderItem(item, totalProductQuantity) {
+      let productPath = /databases/$(database)/documents/products/$(item.productId);
+      let product = get(productPath).data;
+      let expectedPrice = ('discountPriceDzd' in product && product.discountPriceDzd > 0 && product.discountPriceDzd < product.priceDzd)
+                          ? product.discountPriceDzd : product.priceDzd;
+      return item is map &&
+             item.keys().hasAll(['productId', 'nameAr', 'nameFr', 'size', 'color', 'quantity', 'unitPriceDzd']) &&
+             item.keys().hasOnly(['productId', 'nameAr', 'nameFr', 'size', 'color', 'quantity', 'unitPriceDzd']) &&
+             isValidId(item.productId) &&
+             item.nameAr is string && item.nameAr.size() >= 1 && item.nameAr.size() <= 120 &&
+             item.nameFr is string && item.nameFr.size() >= 1 && item.nameFr.size() <= 120 &&
+             item.size is string && item.size.size() <= 40 &&
+             item.color is string && item.color.size() <= 40 &&
+             item.quantity is int && item.quantity >= 1 && item.quantity <= 99 &&
+             item.unitPriceDzd is number && item.unitPriceDzd > 0 &&
+             product.active == true && product.inStock == true &&
+             product.stockQuantity is int && product.stockQuantity >= totalProductQuantity &&
+             item.unitPriceDzd == expectedPrice &&
+             (item.size == '' || !(product.sizes is list) || product.sizes.size() == 0 || item.size in product.sizes) &&
+             (item.color == '' || !(product.colors is list) || product.colors.size() == 0 || item.color in product.colors);
+    }
+
+    function validOrderItems(data) {
+      return data.items.size() >= 1 && data.items.size() <= 10 &&
+             isValidOrderItem(data.items[0], orderQuantityForProduct(data, data.items[0].productId)) &&
+             (data.items.size() < 2 || isValidOrderItem(data.items[1], orderQuantityForProduct(data, data.items[1].productId))) &&
+             (data.items.size() < 3 || isValidOrderItem(data.items[2], orderQuantityForProduct(data, data.items[2].productId))) &&
+             (data.items.size() < 4 || isValidOrderItem(data.items[3], orderQuantityForProduct(data, data.items[3].productId))) &&
+             (data.items.size() < 5 || isValidOrderItem(data.items[4], orderQuantityForProduct(data, data.items[4].productId))) &&
+             (data.items.size() < 6 || isValidOrderItem(data.items[5], orderQuantityForProduct(data, data.items[5].productId))) &&
+             (data.items.size() < 7 || isValidOrderItem(data.items[6], orderQuantityForProduct(data, data.items[6].productId))) &&
+             (data.items.size() < 8 || isValidOrderItem(data.items[7], orderQuantityForProduct(data, data.items[7].productId))) &&
+             (data.items.size() < 9 || isValidOrderItem(data.items[8], orderQuantityForProduct(data, data.items[8].productId))) &&
+             (data.items.size() < 10 || isValidOrderItem(data.items[9], orderQuantityForProduct(data, data.items[9].productId)));
+    }
+
+    function orderSubtotal(data) {
+      return data.items[0].quantity * data.items[0].unitPriceDzd +
+             (data.items.size() > 1 ? data.items[1].quantity * data.items[1].unitPriceDzd : 0) +
+             (data.items.size() > 2 ? data.items[2].quantity * data.items[2].unitPriceDzd : 0) +
+             (data.items.size() > 3 ? data.items[3].quantity * data.items[3].unitPriceDzd : 0) +
+             (data.items.size() > 4 ? data.items[4].quantity * data.items[4].unitPriceDzd : 0) +
+             (data.items.size() > 5 ? data.items[5].quantity * data.items[5].unitPriceDzd : 0) +
+             (data.items.size() > 6 ? data.items[6].quantity * data.items[6].unitPriceDzd : 0) +
+             (data.items.size() > 7 ? data.items[7].quantity * data.items[7].unitPriceDzd : 0) +
+             (data.items.size() > 8 ? data.items[8].quantity * data.items[8].unitPriceDzd : 0) +
+             (data.items.size() > 9 ? data.items[9].quantity * data.items[9].unitPriceDzd : 0);
+    }
+
     function isValidOrder(data) {
       return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
              data.customerName is string && data.customerName.size() >= 2 && data.customerName.size() <= 100 &&
              data.phoneNumber is string && data.phoneNumber.size() >= 6 && data.phoneNumber.size() <= 40 &&
              data.deliveryAddress is string && data.deliveryAddress.size() >= 4 && data.deliveryAddress.size() <= 300 &&
-             data.items is list && data.items.size() >= 1 && data.items.size() <= 50 && data.items[0] is map &&
-             data.subtotalDzd is number && data.subtotalDzd >= 0 && data.subtotalDzd <= 100000000 &&
-             data.totalDzd is number && data.totalDzd >= 0 && data.totalDzd <= 100000000 &&
-             data.status in ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'] &&
+             data.items is list && data.items.size() >= 1 && data.items.size() <= 10 &&
+             validOrderItems(data) &&
+             data.subtotalDzd is number && data.subtotalDzd > 0 && data.subtotalDzd <= 100000000 &&
+             data.totalDzd is number && data.totalDzd > 0 && data.totalDzd <= 100000000 &&
+             data.subtotalDzd == orderSubtotal(data) && data.totalDzd == data.subtotalDzd &&
+             data.status == 'pending' &&
              (!('notes' in data) || (data.notes is string && data.notes.size() <= 500)) &&
-             isValidTimestamp(data.createdAt) &&
-             isValidTimestamp(data.updatedAt);
+             isValidTimestamp(data.createdAt) && isValidTimestamp(data.updatedAt);
     }
 
     function isValidReservation(data) {
@@ -245,25 +311,25 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow get: if isSignedIn() && isValidId(orderId) && (existing().userId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (existing().userId == request.auth.uid || isAdmin());
+      // Spark plan: client order creation is allowed only when every line is checked
+      // against the current authoritative product document and its stored price/stock.
+      // Stock is NOT decremented atomically on Spark; the admin confirms availability
+      // and adjusts inventory when processing the order (see SPARK-PLAN.md).
       allow create: if isSignedIn() &&
                        isValidId(orderId) &&
                        incoming().userId == request.auth.uid &&
-                       incoming().status == 'pending' &&
                        incoming().keys().hasAll(['userId', 'customerName', 'phoneNumber', 'deliveryAddress', 'items', 'subtotalDzd', 'totalDzd', 'status', 'createdAt', 'updatedAt']) &&
                        incoming().keys().hasOnly(['userId', 'customerName', 'phoneNumber', 'deliveryAddress', 'items', 'subtotalDzd', 'totalDzd', 'status', 'notes', 'createdAt', 'updatedAt']) &&
                        isValidOrder(incoming());
-      allow update: if isSignedIn() &&
-                       isValidId(orderId) &&
-                       isValidOrder(incoming()) &&
-                       incoming().userId == existing().userId &&
-                       incoming().createdAt == existing().createdAt && (
-                         isAdmin() || (
-                           existing().userId == request.auth.uid &&
-                           existing().status == 'pending' &&
-                           incoming().status == 'cancelled' &&
-                           incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
-                         )
-                       );
+      allow update: if isSignedIn() && isValidId(orderId) && (
+                       (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+                        incoming().status in ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'] &&
+                        isValidTimestamp(incoming().updatedAt)) ||
+                       (existing().userId == request.auth.uid && existing().status == 'pending' &&
+                        incoming().status == 'cancelled' &&
+                        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+                        isValidTimestamp(incoming().updatedAt))
+                     );
       allow delete: if isAdmin() && isValidId(orderId);
     }
 

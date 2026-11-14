@@ -9,4 +9,14 @@
 .cxx
 *-debug.log
 .env
-debug.keystore
+
+# Local tooling and private credentials
+.vercel/
+node_modules/
+.env.local
+.env.*.local
+serviceAccount*.json
+*-firebase-adminsdk-*.json
+
+# The non-production debug keystore is retained to keep the configured debug OAuth SHA-1 stable.
+# Never use this key to sign a production release.

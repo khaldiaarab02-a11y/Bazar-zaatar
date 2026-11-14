@@ -9,7 +9,7 @@ const fs = require("node:fs");
 const ts = () => new Date(Date.now() - 1000);
 
 let testEnv;
-const PROJECT_ID = process.env.GCP_PROJECT || "demo-no-project";
+const PROJECT_ID = process.env.GCP_PROJECT || process.env.GCLOUD_PROJECT || "demo-bazar-zaatar";
 const ALICE_UID = "alice_123";
 const BOB_UID = "bob_456";
 const ADMIN_UID = "admin_789";
@@ -193,58 +193,78 @@ test("Cart & Profile: strict owner isolation", async () => {
   await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("cart").get());
 });
 
-test("Orders & Reservations: owner can create pending and cancel, cannot spoof status or read other users", async () => {
+test("Orders: customers can create only price-checked pending orders and cannot change them", async () => {
   const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
   const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
   const adminDb = adminContext().firestore();
 
-  // Create order as Alice
-  await assertSucceeds(
-    aliceDb.collection("orders").doc("order_1").set({
-      userId: ALICE_UID,
-      customerName: "Alice Ben",
-      phoneNumber: "0555123456",
-      deliveryAddress: "Tiaret Centre, 14000",
-      items: [{ productId: "prod_1", name: "Chemise", qty: 1, priceDzd: 3900 }],
-      subtotalDzd: 3900,
-      totalDzd: 3900,
-      status: "pending",
-      createdAt: ts(),
-      updatedAt: ts(),
-    })
-  );
+  await assertSucceeds(adminDb.collection("products").doc("prod_1").set({
+    nameAr: "قميص",
+    nameFr: "Chemise",
+    categoryId: "cat_men",
+    priceDzd: 4500,
+    discountPriceDzd: 3900,
+    sizes: ["M", "L"],
+    colors: ["Beige"],
+    stockQuantity: 10,
+    inStock: true,
+    featured: false,
+    newArrival: false,
+    specialOffer: false,
+    active: true,
+    createdAt: ts(),
+    updatedAt: ts(),
+  }));
 
-  // Cannot create directly as confirmed
-  await assertFails(
-    aliceDb.collection("orders").doc("order_bad").set({
-      userId: ALICE_UID,
-      customerName: "Alice Ben",
-      phoneNumber: "0555123456",
-      deliveryAddress: "Tiaret Centre, 14000",
-      items: [{ productId: "prod_1", name: "Chemise", qty: 1, priceDzd: 3900 }],
-      subtotalDzd: 3900,
-      totalDzd: 3900,
-      status: "confirmed",
-      createdAt: ts(),
-      updatedAt: ts(),
-    })
-  );
+  const orderData = {
+    userId: ALICE_UID,
+    customerName: "Alice Ben",
+    phoneNumber: "0555123456",
+    deliveryAddress: "Tiaret Centre, 14000",
+    items: [{ productId: "prod_1", nameAr: "قميص", nameFr: "Chemise", size: "M", color: "Beige", quantity: 1, unitPriceDzd: 3900 }],
+    subtotalDzd: 3900,
+    totalDzd: 3900,
+    status: "pending",
+    createdAt: ts(),
+    updatedAt: ts(),
+  };
+  await assertSucceeds(aliceDb.collection("orders").doc("order_1").set(orderData));
 
-  // Bob cannot read Alice's order or list all orders
+  // A client cannot substitute a cheaper price or falsify the order total.
+  await assertFails(aliceDb.collection("orders").doc("order_bad_price").set({
+    ...orderData,
+    items: [{ ...orderData.items[0], unitPriceDzd: 1 }],
+    subtotalDzd: 1,
+    totalDzd: 1,
+  }));
+  await assertFails(aliceDb.collection("orders").doc("order_bad_total").set({
+    ...orderData,
+    totalDzd: 1,
+  }));
+
+  // A customer cannot submit more units than the product stock currently shows.
+  await assertFails(aliceDb.collection("orders").doc("order_overstock").set({
+    ...orderData,
+    items: [{ ...orderData.items[0], quantity: 11 }],
+    subtotalDzd: 42900,
+    totalDzd: 42900,
+  }));
+
+  // A customer cannot create an already-confirmed order or write for another user.
+  await assertFails(aliceDb.collection("orders").doc("order_confirmed").set({ ...orderData, status: "confirmed" }));
+  await assertFails(aliceDb.collection("orders").doc("order_other_user").set({ ...orderData, userId: BOB_UID }));
+
+  // A customer cannot rewrite the stored price/total after placing an order.
+  await assertFails(aliceDb.collection("orders").doc("order_1").update({ totalDzd: 1, updatedAt: ts() }));
+
+  // Bob cannot read Alice's order or list all orders; Alice can query her own orders.
   await assertFails(bobDb.collection("orders").doc("order_1").get());
   await assertFails(bobDb.collection("orders").get());
-
-  // Alice can query her own orders
   await assertSucceeds(aliceDb.collection("orders").where("userId", "==", ALICE_UID).get());
 
-  // Admin can list and update order status
+  // Admin can list orders and change only the order status/timestamp.
   await assertSucceeds(adminDb.collection("orders").get());
-  await assertSucceeds(
-    adminDb.collection("orders").doc("order_1").update({
-      status: "confirmed",
-      updatedAt: ts(),
-    })
-  );
+  await assertSucceeds(adminDb.collection("orders").doc("order_1").update({ status: "confirmed", updatedAt: ts() }));
 
   // Reservations
   await assertSucceeds(
