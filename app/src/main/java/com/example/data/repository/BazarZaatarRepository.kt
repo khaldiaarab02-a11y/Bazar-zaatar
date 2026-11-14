@@ -640,47 +640,88 @@ class BazarZaatarRepository(
     ): Result<String> = runCatching {
         val uid = requireUserId()
         require(cartItems.isNotEmpty()) { "Cart cannot be empty" }
-        val orderId = "ord_${UUID.randomUUID().toString().replace("-", "").take(14)}"
-        val docRef = db.collection("orders").document(orderId)
+        require(cartItems.size <= 10) { "A maximum of 10 cart lines can be placed in one order." }
+        require(customerName.trim().length in 2..100) { "Invalid customer name" }
+        require(phoneNumber.trim().length in 6..40) { "Invalid phone number" }
+        require(deliveryAddress.trim().length in 4..300) { "Invalid delivery address" }
+        require(notes.trim().length <= 500) { "Order notes are too long" }
 
-        val itemMaps = cartItems.map { item ->
-            mapOf(
-                "productId" to item.productId,
-                "nameAr" to item.productNameAr,
-                "nameFr" to item.productNameFr,
-                "size" to item.selectedSize,
-                "color" to item.selectedColor,
-                "quantity" to item.quantity,
-                "unitPriceDzd" to item.unitPriceDzd
-            )
-        }
-        val subtotal = cartItems.sumOf { it.unitPriceDzd * it.quantity }
-        val payload = buildMap<String, Any> {
-            put("userId", uid)
-            put("customerName", customerName.trim())
-            put("phoneNumber", phoneNumber.trim())
-            put("deliveryAddress", deliveryAddress.trim())
-            put("items", itemMaps)
-            put("subtotalDzd", subtotal)
-            put("totalDzd", subtotal)
-            put("status", "pending")
-            if (notes.isNotBlank()) put("notes", notes.trim())
-            put("createdAt", FieldValue.serverTimestamp())
-            put("updatedAt", FieldValue.serverTimestamp())
-        }
+        val orderRef = db.collection("orders").document()
         try {
+            db.runTransaction { transaction ->
+                // Read every distinct product before writing the order.
+                val productIds = cartItems.map { it.productId }.distinct()
+                val productSnapshots = productIds.associateWith { productId ->
+                    transaction.get(db.collection("products").document(productId))
+                }
+                val totalQuantityByProduct = cartItems.groupBy { it.productId }
+                    .mapValues { (_, lines) -> lines.sumOf { it.quantity } }
+
+                val orderItems = cartItems.map { item ->
+                    val snapshot = productSnapshots[item.productId]
+                        ?: throw IllegalStateException("Product is missing from the cart.")
+                    require(snapshot.exists()) { "A product is no longer available." }
+                    val product = snapshot.toObject(Product::class.java)
+                        ?: throw IllegalStateException("Product data is invalid.")
+                    val totalProductQuantity = totalQuantityByProduct[item.productId] ?: item.quantity
+                    require(product.active && product.inStock && product.stockQuantity >= totalProductQuantity) {
+                        "Insufficient stock for ${product.nameAr}."
+                    }
+                    require(item.selectedSize.isBlank() || product.sizes.isEmpty() || item.selectedSize in product.sizes) {
+                        "Selected size is no longer available for ${product.nameAr}."
+                    }
+                    require(item.selectedColor.isBlank() || product.colors.isEmpty() || item.selectedColor in product.colors) {
+                        "Selected color is no longer available for ${product.nameAr}."
+                    }
+                    val unitPrice = product.effectivePriceDzd
+                    require(unitPrice > 0.0 && unitPrice.isFinite()) { "Product price is invalid." }
+                    mapOf(
+                        "productId" to item.productId,
+                        "nameAr" to product.nameAr.ifBlank { product.nameFr },
+                        "nameFr" to product.nameFr.ifBlank { product.nameAr },
+                        "size" to item.selectedSize,
+                        "color" to item.selectedColor,
+                        "quantity" to item.quantity.toInt(),
+                        "unitPriceDzd" to unitPrice
+                    )
+                }
+                val subtotalDzd = orderItems.sumOf { line ->
+                    (line["quantity"] as Int).toDouble() * (line["unitPriceDzd"] as Double)
+                }
+                require(subtotalDzd > 0.0 && subtotalDzd.isFinite()) { "Order total is invalid." }
+
+                transaction.set(orderRef, mapOf(
+                    "userId" to uid,
+                    "customerName" to customerName.trim(),
+                    "phoneNumber" to phoneNumber.trim(),
+                    "deliveryAddress" to deliveryAddress.trim(),
+                    "items" to orderItems,
+                    "subtotalDzd" to subtotalDzd,
+                    "totalDzd" to subtotalDzd,
+                    "status" to "pending",
+                    "notes" to notes.trim(),
+                    "createdAt" to FieldValue.serverTimestamp(),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                ))
+                orderRef.id
+            }.await()
+
+            // Clear cart records only after Firestore confirms that the order was created.
             val batch = db.batch()
-            batch.set(docRef, payload)
             cartItems.forEach { item ->
                 val cartRef = db.collection("users").document(uid).collection("cart").document(item.id)
                 batch.delete(cartRef)
             }
-            batch.commit().await()
-            orderId
+            try {
+                batch.commit().await()
+            } catch (cleanupError: Exception) {
+                android.util.Log.w("BazarZaatarRepository", "Order ${orderRef.id} created, but cart cleanup failed", cleanupError)
+            }
+            orderRef.id
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            handleFirestoreError(e, OperationType.CREATE, docRef.path, auth)
+            handleFirestoreError(e, OperationType.CREATE, "orders", auth)
             throw e
         }
     }
