@@ -1,1 +1,75 @@
+name: Bazar Zaatar Android and Firestore checks
 
+"on":
+  workflow_dispatch:
+  push:
+    paths:
+      - "app/**"
+      - "web/**"
+      - "gradle/**"
+      - "*.gradle.kts"
+      - "gradle.properties"
+      - "firestore.rules"
+      - "firestore.test.js"
+      - "firebase.json"
+      - "SPARK-PLAN.md"
+      - "package.json"
+      - ".github/workflows/android-and-rules.yml"
+
+jobs:
+  firestore-rules:
+    name: Firestore security rules tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Set up Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Check Web and Firestore test JavaScript syntax
+        run: |
+          node --check web/app.js
+          node --check firestore.test.js
+      - name: Install test dependencies
+        run: npm install --no-audit --no-fund
+      - name: Run Firestore rules tests
+        run: npm run test:rules
+
+  android-debug-apk:
+    name: Build Android debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-36.1" "build-tools;36.0.0"
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
+      - name: Verify required Firebase config and debug key
+        run: |
+          test -s app/google-services.json
+          test -s debug.keystore
+      - name: Assemble debug APK
+        run: gradle --no-daemon --stacktrace :app:assembleDebug
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: bazar-zaatar-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
